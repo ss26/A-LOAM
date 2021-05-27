@@ -10,7 +10,8 @@
 
 
     <!-- Needed if no transform is being published by bag file -->
-    <node pkg="tf" type="static_transform_publisher" name="camera_init_to_map"  args="0 0 0 1.570795   0        1.570795 /map    /camera_init 10" />
+    <!-- <node pkg="tf" type="static_transform_publisher" name="camera_init_to_map"  args="0 0 0 1.570795   0        1.570795 /map    /camera_init 10" /> -->
+    <node pkg="tf" type="static_transform_publisher" name="camera_init_to_map"  args="0 0 0 0   0        0 /map    /camera_init 100" />
 
 
     <param name="mapping_line_resolution" type="double" value="0.2"/>
