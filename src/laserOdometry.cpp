@@ -51,6 +51,8 @@
 #include <eigen3/Eigen/Dense>
 #include <mutex>
 #include <queue>
+#include <fstream>
+#include <std_msgs/Int32.h>
 
 #include "aloam_velodyne/common.h"
 #include "aloam_velodyne/tic_toc.h"
@@ -107,6 +109,35 @@ std::queue<sensor_msgs::PointCloud2ConstPtr> surfLessFlatBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> fullPointsBuf;
 std::mutex mBuf;
 
+std::ofstream cor_corres_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/cor_correspondences.csv");
+std::ofstream plane_corres_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/plane_correspondences.csv");
+
+// // write to csv
+// void writeCSV(std::pair<std::string, int> dataset)
+// {
+    
+
+//     correspondences << dataset.first << "," << "\n" << dataset.second;
+
+//     // for(int j=0; j<dataset.size(); ++j)
+//     // {
+//     //     correspondences << dataset.first;
+//     //     if(j != dataset.size() - 1) correspondences << ","; 
+//     // }
+
+//     // for(int i = 0; i < dataset.second; ++i)
+//     // {
+//     //     for(int j=0; j < dataset.size(); ++j)
+//     //     {
+//     //         correspondences << dataset.at(j).second.at(i);
+//     //         if(j != dataset.size() - 1) correspondences << ",";
+//     //     }
+//     //     correspondences << "\n";
+//     // }
+
+//     correspondences.close();    
+// }
+
 // undistort lidar point
 void TransformToStart(PointType const *const pi, PointType *const po)
 {
@@ -147,6 +178,7 @@ void TransformToEnd(PointType const *const pi, PointType *const po)
     po->intensity = int(pi->intensity);
 }
 
+// probably for concurrency
 void laserCloudSharpHandler(const sensor_msgs::PointCloud2ConstPtr &cornerPointsSharp2)
 {
     mBuf.lock();
@@ -379,10 +411,15 @@ int main(int argc, char **argv)
                                 s = 1.0;
                             ceres::CostFunction *cost_function = LidarEdgeFactor::Create(curr_point, last_point_a, last_point_b, s);
                             problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
+                            cor_corres_csv << corner_correspondence << ",";
                             corner_correspondence++;
+                            // std::pair<std::string, int> cornersToCSV = {"Corner", corner_correspondence};
+                            // writeCSV(cornersToCSV);
                         }
                     }
-
+                    
+                    cor_corres_csv << "\n";
+                    
                     // find correspondence for plane features
                     for (int i = 0; i < surfPointsFlatNum; ++i)
                     {
@@ -477,12 +514,17 @@ int main(int argc, char **argv)
                                     s = 1.0;
                                 ceres::CostFunction *cost_function = LidarPlaneFactor::Create(curr_point, last_point_a, last_point_b, last_point_c, s);
                                 problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
+                                plane_corres_csv << plane_correspondence << ",";
                                 plane_correspondence++;
+                                // std::pair<std::string, int> surfsToCSV = {"Plane", plane_correspondence};
+                                // writeCSV(surfsToCSV);                     
                             }
                         }
                     }
 
-                    //printf("coner_correspondance %d, plane_correspondence %d \n", corner_correspondence, plane_correspondence);
+                    plane_corres_csv << "\n";
+
+                    printf("corner_correspondance %d, plane_correspondence %d \n", corner_correspondence, plane_correspondence);
                     printf("data association time %f ms \n", t_data.toc());
 
                     if ((corner_correspondence + plane_correspondence) < 10)
@@ -500,6 +542,7 @@ int main(int argc, char **argv)
                     printf("solver time %f ms \n", t_solver.toc());
                 }
                 printf("optimization twice time %f \n", t_opt.toc());
+                // printf("surface points num: %d corner points num: %d", surfPointsFlatNum, cornerPointsSharpNum);
 
                 t_w_curr = t_w_curr + q_w_curr * t_last_curr;
                 q_w_curr = q_w_curr * q_last_curr;
@@ -567,6 +610,11 @@ int main(int argc, char **argv)
             kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
             kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
 
+            // testing writing to CSV
+            // std::ofstream test("/home/ss26/Projects/Active-SLAM/loam_action_space/test.csv");
+            // test << corner_correspondence << "," << plane_correspondence;
+            // test.close();
+
             if (frameCount % skipFrameNum == 0)
             {
                 frameCount = 0;
@@ -591,12 +639,12 @@ int main(int argc, char **argv)
             }
             printf("publication time %f ms \n", t_pub.toc());
             printf("whole laserOdometry time %f ms \n \n", t_whole.toc());
-            if(t_whole.toc() > 100)
-                ROS_WARN("odometry process over 100ms");
-
+            if(t_whole.toc() > 100) ROS_WARN("odometry process over 100ms");
             frameCount++;
         }
         rate.sleep();
     }
+    cor_corres_csv.close();
+    plane_corres_csv.close();
     return 0;
 }

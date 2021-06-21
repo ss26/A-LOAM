@@ -34,6 +34,9 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+// TODO: get the directory to save data from terminal
+
+
 #include <math.h>
 #include <vector>
 #include <aloam_velodyne/common.h>
@@ -57,6 +60,8 @@
 #include <thread>
 #include <iostream>
 #include <string>
+#include <fstream>
+#include <std_msgs/Int32.h>
 
 #include "lidarFactor.hpp"
 #include "aloam_velodyne/common.h"
@@ -84,6 +89,11 @@ const int laserCloudNum = laserCloudWidth * laserCloudHeight * laserCloudDepth; 
 
 int laserCloudValidInd[125];
 int laserCloudSurroundInd[125];
+
+// files to write data
+std::ofstream corners_used_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/used_corners.csv");
+std::ofstream surfs_used_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/used_surfs.csv");
+std::ofstream drifts("/home/ss26/Projects/Active-SLAM/loam_action_space/drifts.csv");
 
 // input: from odom
 pcl::PointCloud<PointType>::Ptr laserCloudCornerLast(new pcl::PointCloud<PointType>());
@@ -119,7 +129,6 @@ Eigen::Vector3d t_wmap_wodom(0, 0, 0);
 Eigen::Quaterniond q_wodom_curr(1, 0, 0, 0);
 Eigen::Vector3d t_wodom_curr(0, 0, 0);
 
-
 std::queue<sensor_msgs::PointCloud2ConstPtr> cornerLastBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> surfLastBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> fullResBuf;
@@ -137,6 +146,10 @@ PointType pointOri, pointSel;
 ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath;
 
 nav_msgs::Path laserAfterMappedPath;
+nav_msgs::Path gtPath;
+nav_msgs::Odometry odom;
+
+float drift;
 
 // set initial guess
 void transformAssociateToMap()
@@ -225,11 +238,50 @@ void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr &laserOdometry)
 	odomAftMapped.pose.pose.position.x = t_w_curr.x();
 	odomAftMapped.pose.pose.position.y = t_w_curr.y();
 	odomAftMapped.pose.pose.position.z = t_w_curr.z();
+
+	odom.pose.pose.position.x = t_w_curr.x();
+	odom.pose.pose.position.y = t_w_curr.y();
+
 	pubOdomAftMappedHighFrec.publish(odomAftMapped);
 }
 
+void drift_init()
+{
+	drifts << "drifts\n";
+}
+
+void gtPathHandler(const nav_msgs::PathConstPtr &gt)
+{	
+	geometry_msgs::PoseStamped gtPose;
+	gtPose.header = gt->header;
+	gtPose.pose.position.x = gt->poses[0].pose.position.x;
+	gtPose.pose.position.y = gt->poses[0].pose.position.y;
+	gtPose.pose.position.z = gt->poses[0].pose.position.z;
+	gtPath.header.stamp = gt->header.stamp;
+	gtPath.header.frame_id = "/camera_init";
+	gtPath.poses.push_back(gtPose);
+
+	float x_gt = gtPath.poses[0].pose.position.x;
+	float y_gt = gtPath.poses[0].pose.position.y;	
+	float x_odom = odom.pose.pose.position.x;
+	float y_odom = odom.pose.pose.position.y;
+	drift = sqrt(pow(x_gt - x_odom,2) + pow(y_gt - y_odom,2));
+}
+
+// void calc_drift()
+// {
+// 	float x_gt = gtPath.poses[0].pose.position.x;
+// 	float y_gt = gtPath.poses[0].pose.position.y;	
+// 	float x_odom = odom.pose.pose.position.x;
+// 	float y_odom = odom.pose.pose.position.y;
+// 	float drift = sqrt(pow(x_gt - x_odom,2) + pow(y_gt - y_odom,2));
+// 	return drift;
+// }
+
 void process()
 {
+	corners_used_csv << "total,used\n";
+	surfs_used_csv << "total,used\n";
 	while(1)
 	{
 		while (!cornerLastBuf.empty() && !surfLastBuf.empty() &&
@@ -551,6 +603,7 @@ void process()
 
 			printf("map prepare time %f ms\n", t_shift.toc());
 			printf("map corner num %d  surf num %d \n", laserCloudCornerFromMapNum, laserCloudSurfFromMapNum);
+
 			if (laserCloudCornerFromMapNum > 10 && laserCloudSurfFromMapNum > 50)
 			{
 				TicToc t_opt;
@@ -704,9 +757,17 @@ void process()
 						*/
 					}
 
-					//printf("corner num %d used corner num %d \n", laserCloudCornerStackNum, corner_num);
-					//printf("surf num %d used surf num %d \n", laserCloudSurfStackNum, surf_num);
+					printf("corner num %d used corner num %d \n", laserCloudCornerStackNum, corner_num);
+					printf("surf num %d used surf num %d \n", laserCloudSurfStackNum, surf_num);
+					
+					// add corners and surfs to csv
+					corners_used_csv << laserCloudCornerStackNum << "," << corner_num << std::endl;
+					surfs_used_csv << laserCloudSurfStackNum << "," << surf_num << std::endl;
 
+					// add drifts to csv
+					drifts << drift << std::endl;
+					printf("\nDrift for this frame is %f\n", drift);
+					
 					printf("mapping data assosiation time %f ms \n", t_data.toc());
 
 					TicToc t_solver;
@@ -913,6 +974,9 @@ int main(int argc, char **argv)
 
 	ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_3", 100, laserCloudFullResHandler);
 
+	// use queue size 1000 to calculate the correct amount of drifts
+	ros::Subscriber subGTpath = nh.subscribe<nav_msgs::Path>("/gt_path", 1000, gtPathHandler);
+
 	pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 100);
 
 	pubLaserCloudMap = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_map", 100);
@@ -930,6 +994,8 @@ int main(int argc, char **argv)
 		laserCloudCornerArray[i].reset(new pcl::PointCloud<PointType>());
 		laserCloudSurfArray[i].reset(new pcl::PointCloud<PointType>());
 	}
+
+	drift_init();
 
 	std::thread mapping_process{process};
 
