@@ -254,17 +254,19 @@ void gtPathHandler(const nav_msgs::PathConstPtr &gt)
 {	
 	geometry_msgs::PoseStamped gtPose;
 	gtPose.header = gt->header;
-	gtPose.pose.position.x = gt->poses[0].pose.position.x;
-	gtPose.pose.position.y = gt->poses[0].pose.position.y;
-	gtPose.pose.position.z = gt->poses[0].pose.position.z;
+	gtPose.pose.position.x = gt->poses.back().pose.position.x;
+	gtPose.pose.position.y = gt->poses.back().pose.position.y;
+	gtPose.pose.position.z = gt->poses.back().pose.position.z;
 	gtPath.header.stamp = gt->header.stamp;
 	gtPath.header.frame_id = "/camera_init";
 	gtPath.poses.push_back(gtPose);
 
-	float x_gt = gtPath.poses[0].pose.position.x;
-	float y_gt = gtPath.poses[0].pose.position.y;	
+	float x_gt = gtPath.poses.back().pose.position.x;
+	float y_gt = gtPath.poses.back().pose.position.y;	
 	float x_odom = odom.pose.pose.position.x;
 	float y_odom = odom.pose.pose.position.y;
+	// std::cout << std::endl << "x_gt: " << x_gt << ", y_gt: " << y_gt << std::endl;
+	// std::cout << std::endl << "x_odom: " << x_odom << ", y_odom: " << y_odom << std::endl;
 	drift = sqrt(pow(x_gt - x_odom,2) + pow(y_gt - y_odom,2));
 }
 
