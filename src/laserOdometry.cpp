@@ -109,8 +109,8 @@ std::queue<sensor_msgs::PointCloud2ConstPtr> surfLessFlatBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> fullPointsBuf;
 std::mutex mBuf;
 
-std::ofstream cor_corres_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/cor_correspondences.csv");
-std::ofstream plane_corres_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/plane_correspondences.csv");
+std::ofstream cor_corres_csv("/home/ss26/Projects/data/cor_correspondences.csv");
+std::ofstream plane_corres_csv("/home/ss26/Projects/data/plane_correspondences.csv");
 
 // // write to csv
 // void writeCSV(std::pair<std::string, int> dataset)

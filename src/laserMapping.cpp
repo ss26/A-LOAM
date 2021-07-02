@@ -91,9 +91,13 @@ int laserCloudValidInd[125];
 int laserCloudSurroundInd[125];
 
 // files to write data
-std::ofstream corners_used_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/used_corners.csv");
-std::ofstream surfs_used_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/used_surfs.csv");
-std::ofstream drifts("/home/ss26/Projects/Active-SLAM/loam_action_space/drifts.csv");
+std::ofstream corners_used_csv("/home/ss26/Projects/data/used_corners.csv");
+std::ofstream surfs_used_csv("/home/ss26/Projects/data/used_surfs.csv");
+std::ofstream apes("/home/ss26/Projects/data/apes.csv");
+std::ofstream rpe_gt_csv("/home/ss26/Projects/data/rpe_gt.csv");
+std::ofstream rpe_est_csv("/home/ss26/Projects/data/rpe_est.csv");
+std::ofstream rpe_gt_txt("/home/ss26/Projects/data/rpe_gt.txt");
+std::ofstream rpe_est_txt("/home/ss26/Projects/data/rpe_est.txt");
 
 // input: from odom
 pcl::PointCloud<PointType>::Ptr laserCloudCornerLast(new pcl::PointCloud<PointType>());
@@ -143,13 +147,15 @@ std::vector<float> pointSearchSqDis;
 
 PointType pointOri, pointSel;
 
-ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath;
+ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pubOdomAftMapped, pubOdomAftMappedHighFrec, pubLaserAfterMappedPath, pubGTOdom;
 
 nav_msgs::Path laserAfterMappedPath;
 nav_msgs::Path gtPath;
 nav_msgs::Odometry odom;
+nav_msgs::Odometry gtOdom;
 
-float drift;
+float ape;
+float rpe;
 
 // set initial guess
 void transformAssociateToMap()
@@ -239,24 +245,58 @@ void laserOdometryHandler(const nav_msgs::Odometry::ConstPtr &laserOdometry)
 	odomAftMapped.pose.pose.position.y = t_w_curr.y();
 	odomAftMapped.pose.pose.position.z = t_w_curr.z();
 
+	// for apes
 	odom.pose.pose.position.x = t_w_curr.x();
 	odom.pose.pose.position.y = t_w_curr.y();
+
+	// for rpes 
+	odom.header.frame_id = "/camera_init";
+	odom.header.stamp = laserOdometry->header.stamp;
+	odom.pose.pose.position.z = t_w_curr.z();
+	odom.pose.pose.orientation.x = q_w_curr.x();
+	odom.pose.pose.orientation.y = q_w_curr.y();
+	odom.pose.pose.orientation.z = q_w_curr.z();
+	odom.pose.pose.orientation.w = q_w_curr.w();
 
 	pubOdomAftMappedHighFrec.publish(odomAftMapped);
 }
 
-void drift_init()
+void apes_init()
 {
-	drifts << "drifts\n";
+	apes << "apes\n";
+}
+
+void rpes_init()
+{
+	rpe_gt_csv << "timestamp,tx,ty,tz,qx,qy,qz,qw\n";
+	rpe_est_csv << "timestamp,tx,ty,tz,qx,qy,qz,qw\n";
 }
 
 void gtPathHandler(const nav_msgs::PathConstPtr &gt)
 {	
+	// publish GT odom
+	gtOdom.header.frame_id = gt->header.frame_id;
+	gtOdom.header.stamp = odom.header.stamp;
+	gtOdom.pose.pose.position = gt->poses.back().pose.position;
+	gtOdom.pose.pose.orientation = gt->poses.back().pose.orientation;
+	
+	pubGTOdom.publish(gtOdom);
+	
 	geometry_msgs::PoseStamped gtPose;
-	gtPose.header = gt->header;
+	gtPose.header.frame_id = gt->header.frame_id;
+	gtPose.header.stamp = gt->header.stamp;
+	
+	// for apes
 	gtPose.pose.position.x = gt->poses.back().pose.position.x;
 	gtPose.pose.position.y = gt->poses.back().pose.position.y;
+	
+	// for rpes
 	gtPose.pose.position.z = gt->poses.back().pose.position.z;
+	gtPose.pose.orientation.x = gt->poses.back().pose.orientation.x;
+	gtPose.pose.orientation.y = gt->poses.back().pose.orientation.y;
+	gtPose.pose.orientation.z = gt->poses.back().pose.orientation.z;
+	gtPose.pose.orientation.w = gt->poses.back().pose.orientation.w;
+
 	gtPath.header.stamp = gt->header.stamp;
 	gtPath.header.frame_id = "/camera_init";
 	gtPath.poses.push_back(gtPose);
@@ -267,12 +307,7 @@ void gtPathHandler(const nav_msgs::PathConstPtr &gt)
 	float y_odom = odom.pose.pose.position.y;
 	// std::cout << std::endl << "x_gt: " << x_gt << ", y_gt: " << y_gt << std::endl;
 	// std::cout << std::endl << "x_odom: " << x_odom << ", y_odom: " << y_odom << std::endl;
-	drift = sqrt(pow(x_gt - x_odom,2) + pow(y_gt - y_odom,2));
-}
-
-void relative_drift()
-{
-	
+	ape = sqrt(pow(x_gt - x_odom,2) + pow(y_gt - y_odom,2));
 }
 
 // void calc_drift()
@@ -771,9 +806,30 @@ void process()
 					corners_used_csv << laserCloudCornerStackNum << "," << corner_num << std::endl;
 					surfs_used_csv << laserCloudSurfStackNum << "," << surf_num << std::endl;
 
-					// add drifts to csv
-					drifts << drift << std::endl;
-					printf("\nDrift for this frame is %f\n", drift);
+					// add apes to csv
+					apes << ape << std::endl;
+					printf("\nAPE for this frame is %f\n", ape);
+
+					// add rpes to csv
+					rpe_gt_csv << gtOdom.header.stamp << "," << gtPath.poses.back().pose.position.x << "," \
+						   << gtPath.poses.back().pose.position.y << "," << gtPath.poses.back().pose.position.z << "," \
+						   << gtPath.poses.back().pose.orientation.x << "," << gtPath.poses.back().pose.orientation.y << "," \
+						   << gtPath.poses.back().pose.orientation.z << "," << gtPath.poses.back().pose.orientation.w << std::endl;
+					
+					rpe_est_csv << odom.header.stamp << "," << odom.pose.pose.position.x << "," \
+					        << odom.pose.pose.position.y << "," << odom.pose.pose.position.z << "," \
+							<< odom.pose.pose.orientation.x << "," << odom.pose.pose.orientation.y << "," \
+							<< odom.pose.pose.orientation.z << "," << odom.pose.pose.orientation.w << std::endl;
+
+					rpe_gt_txt << gtOdom.header.stamp << "," << gtPath.poses.back().pose.position.x << "," \
+						   << gtPath.poses.back().pose.position.y << "," << gtPath.poses.back().pose.position.z << "," \
+						   << gtPath.poses.back().pose.orientation.x << "," << gtPath.poses.back().pose.orientation.y << "," \
+						   << gtPath.poses.back().pose.orientation.z << "," << gtPath.poses.back().pose.orientation.w << std::endl;
+					
+					rpe_est_txt << odom.header.stamp << "," << odom.pose.pose.position.x << "," \
+					        << odom.pose.pose.position.y << "," << odom.pose.pose.position.z << "," \
+							<< odom.pose.pose.orientation.x << "," << odom.pose.pose.orientation.y << "," \
+							<< odom.pose.pose.orientation.z << "," << odom.pose.pose.orientation.w << std::endl;
 					
 					printf("mapping data assosiation time %f ms \n", t_data.toc());
 
@@ -981,8 +1037,10 @@ int main(int argc, char **argv)
 
 	ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_3", 100, laserCloudFullResHandler);
 
-	// use queue size 1000 to calculate the correct amount of drifts
+	// use queue size 1000 to calculate the correct amount of apes
 	ros::Subscriber subGTpath = nh.subscribe<nav_msgs::Path>("/gt_path", 1000, gtPathHandler);
+
+	pubGTOdom = nh.advertise<nav_msgs::Odometry>("/ground_truth", 100);
 
 	pubLaserCloudSurround = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surround", 100);
 
@@ -1002,7 +1060,8 @@ int main(int argc, char **argv)
 		laserCloudSurfArray[i].reset(new pcl::PointCloud<PointType>());
 	}
 
-	drift_init();
+	apes_init();
+	rpes_init();
 
 	std::thread mapping_process{process};
 
