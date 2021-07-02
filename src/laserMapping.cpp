@@ -270,6 +270,11 @@ void gtPathHandler(const nav_msgs::PathConstPtr &gt)
 	drift = sqrt(pow(x_gt - x_odom,2) + pow(y_gt - y_odom,2));
 }
 
+void relative_drift()
+{
+	
+}
+
 // void calc_drift()
 // {
 // 	float x_gt = gtPath.poses[0].pose.position.x;
