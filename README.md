@@ -1,4 +1,9 @@
 # A-LOAM
+
+## ROS-Noetic Support
+
+This fork supports A-LOAM on ROS-Noetic. Build instructions are the same as the original repo. See [Build A-LOAM](#build-aloam).
+
 ## Advanced implementation of LOAM
 
 A-LOAM is an Advanced implementation of LOAM (J. Zhang and S. Singh. LOAM: Lidar Odometry and Mapping in Real-time), which uses Eigen and Ceres Solver to simplify code structure. This code is modified from LOAM and [LOAM_NOTED](https://github.com/cuitaixiang/LOAM_NOTED). This code is clean and simple without complicated mathematical derivation and redundant operations. It is a good learning material for SLAM beginners.
@@ -21,7 +26,7 @@ Follow [Ceres Installation](http://ceres-solver.org/installation.html).
 Follow [PCL Installation](http://www.pointclouds.org/downloads/linux.html).
 
 
-## 2. Build A-LOAM
+## <a name="build-aloam"></a> 2. Build A-LOAM
 Clone the repository and catkin_make:
 
 ```
