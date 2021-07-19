@@ -41,7 +41,7 @@
 #include "aloam_velodyne/common.h"
 #include "aloam_velodyne/tic_toc.h"
 #include <nav_msgs/Odometry.h>
-#include <opencv/cv.h>
+#include <opencv2/opencv.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -413,31 +413,31 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
     sensor_msgs::PointCloud2 laserCloudOutMsg;
     pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
     laserCloudOutMsg.header.stamp = laserCloudMsg->header.stamp;
-    laserCloudOutMsg.header.frame_id = "/camera_init";
+    laserCloudOutMsg.header.frame_id = "camera_init";
     pubLaserCloud.publish(laserCloudOutMsg);
 
     sensor_msgs::PointCloud2 cornerPointsSharpMsg;
     pcl::toROSMsg(cornerPointsSharp, cornerPointsSharpMsg);
     cornerPointsSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-    cornerPointsSharpMsg.header.frame_id = "/camera_init";
+    cornerPointsSharpMsg.header.frame_id = "camera_init";
     pubCornerPointsSharp.publish(cornerPointsSharpMsg);
 
     sensor_msgs::PointCloud2 cornerPointsLessSharpMsg;
     pcl::toROSMsg(cornerPointsLessSharp, cornerPointsLessSharpMsg);
     cornerPointsLessSharpMsg.header.stamp = laserCloudMsg->header.stamp;
-    cornerPointsLessSharpMsg.header.frame_id = "/camera_init";
+    cornerPointsLessSharpMsg.header.frame_id = "camera_init";
     pubCornerPointsLessSharp.publish(cornerPointsLessSharpMsg);
 
     sensor_msgs::PointCloud2 surfPointsFlat2;
     pcl::toROSMsg(surfPointsFlat, surfPointsFlat2);
     surfPointsFlat2.header.stamp = laserCloudMsg->header.stamp;
-    surfPointsFlat2.header.frame_id = "/camera_init";
+    surfPointsFlat2.header.frame_id = "camera_init";
     pubSurfPointsFlat.publish(surfPointsFlat2);
 
     sensor_msgs::PointCloud2 surfPointsLessFlat2;
     pcl::toROSMsg(surfPointsLessFlat, surfPointsLessFlat2);
     surfPointsLessFlat2.header.stamp = laserCloudMsg->header.stamp;
-    surfPointsLessFlat2.header.frame_id = "/camera_init";
+    surfPointsLessFlat2.header.frame_id = "camera_init";
     pubSurfPointsLessFlat.publish(surfPointsLessFlat2);
 
     // pub each scam
@@ -448,7 +448,7 @@ void laserCloudHandler(const sensor_msgs::PointCloud2ConstPtr &laserCloudMsg)
             sensor_msgs::PointCloud2 scanMsg;
             pcl::toROSMsg(laserCloudScans[i], scanMsg);
             scanMsg.header.stamp = laserCloudMsg->header.stamp;
-            scanMsg.header.frame_id = "/camera_init";
+            scanMsg.header.frame_id = "camera_init";
             pubEachScan[i].publish(scanMsg);
         }
     }
@@ -475,25 +475,25 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_points", 100, laserCloudHandler);
+    ros::Subscriber subLaserCloud = nh.subscribe<sensor_msgs::PointCloud2>("velodyne_points", 100, laserCloudHandler);
 
-    pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100);
+    pubLaserCloud = nh.advertise<sensor_msgs::PointCloud2>("velodyne_cloud_2", 100);
 
-    pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100);
+    pubCornerPointsSharp = nh.advertise<sensor_msgs::PointCloud2>("laser_cloud_sharp", 100);
 
-    pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100);
+    pubCornerPointsLessSharp = nh.advertise<sensor_msgs::PointCloud2>("laser_cloud_less_sharp", 100);
 
-    pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_flat", 100);
+    pubSurfPointsFlat = nh.advertise<sensor_msgs::PointCloud2>("laser_cloud_flat", 100);
 
-    pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100);
+    pubSurfPointsLessFlat = nh.advertise<sensor_msgs::PointCloud2>("laser_cloud_less_flat", 100);
 
-    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("/laser_remove_points", 100);
+    pubRemovePoints = nh.advertise<sensor_msgs::PointCloud2>("laser_remove_points", 100);
 
     if(PUB_EACH_LINE)
     {
         for(int i = 0; i < N_SCANS; i++)
         {
-            ros::Publisher tmp = nh.advertise<sensor_msgs::PointCloud2>("/laser_scanid_" + std::to_string(i), 100);
+            ros::Publisher tmp = nh.advertise<sensor_msgs::PointCloud2>("laser_scanid_" + std::to_string(i), 100);
             pubEachScan.push_back(tmp);
         }
     }

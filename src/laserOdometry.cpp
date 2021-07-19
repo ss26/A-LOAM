@@ -51,6 +51,8 @@
 #include <eigen3/Eigen/Dense>
 #include <mutex>
 #include <queue>
+#include <fstream>
+#include <std_msgs/Int32.h>
 
 #include "aloam_velodyne/common.h"
 #include "aloam_velodyne/tic_toc.h"
@@ -107,6 +109,35 @@ std::queue<sensor_msgs::PointCloud2ConstPtr> surfLessFlatBuf;
 std::queue<sensor_msgs::PointCloud2ConstPtr> fullPointsBuf;
 std::mutex mBuf;
 
+std::ofstream cor_corres_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/cor_correspondences.csv");
+std::ofstream plane_corres_csv("/home/ss26/Projects/Active-SLAM/loam_action_space/plane_correspondences.csv");
+
+// // write to csv
+// void writeCSV(std::pair<std::string, int> dataset)
+// {
+    
+
+//     correspondences << dataset.first << "," << "\n" << dataset.second;
+
+//     // for(int j=0; j<dataset.size(); ++j)
+//     // {
+//     //     correspondences << dataset.first;
+//     //     if(j != dataset.size() - 1) correspondences << ","; 
+//     // }
+
+//     // for(int i = 0; i < dataset.second; ++i)
+//     // {
+//     //     for(int j=0; j < dataset.size(); ++j)
+//     //     {
+//     //         correspondences << dataset.at(j).second.at(i);
+//     //         if(j != dataset.size() - 1) correspondences << ",";
+//     //     }
+//     //     correspondences << "\n";
+//     // }
+
+//     correspondences.close();    
+// }
+
 // undistort lidar point
 void TransformToStart(PointType const *const pi, PointType *const po)
 {
@@ -147,6 +178,7 @@ void TransformToEnd(PointType const *const pi, PointType *const po)
     po->intensity = int(pi->intensity);
 }
 
+// probably for concurrency
 void laserCloudSharpHandler(const sensor_msgs::PointCloud2ConstPtr &cornerPointsSharp2)
 {
     mBuf.lock();
@@ -192,25 +224,25 @@ int main(int argc, char **argv)
 
     printf("Mapping %d Hz \n", 10 / skipFrameNum);
 
-    ros::Subscriber subCornerPointsSharp = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_sharp", 100, laserCloudSharpHandler);
+    ros::Subscriber subCornerPointsSharp = nh.subscribe<sensor_msgs::PointCloud2>("laser_cloud_sharp", 100, laserCloudSharpHandler);
 
-    ros::Subscriber subCornerPointsLessSharp = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_less_sharp", 100, laserCloudLessSharpHandler);
+    ros::Subscriber subCornerPointsLessSharp = nh.subscribe<sensor_msgs::PointCloud2>("laser_cloud_less_sharp", 100, laserCloudLessSharpHandler);
 
-    ros::Subscriber subSurfPointsFlat = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_flat", 100, laserCloudFlatHandler);
+    ros::Subscriber subSurfPointsFlat = nh.subscribe<sensor_msgs::PointCloud2>("laser_cloud_flat", 100, laserCloudFlatHandler);
 
-    ros::Subscriber subSurfPointsLessFlat = nh.subscribe<sensor_msgs::PointCloud2>("/laser_cloud_less_flat", 100, laserCloudLessFlatHandler);
+    ros::Subscriber subSurfPointsLessFlat = nh.subscribe<sensor_msgs::PointCloud2>("laser_cloud_less_flat", 100, laserCloudLessFlatHandler);
 
-    ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("/velodyne_cloud_2", 100, laserCloudFullResHandler);
+    ros::Subscriber subLaserCloudFullRes = nh.subscribe<sensor_msgs::PointCloud2>("velodyne_cloud_2", 100, laserCloudFullResHandler);
 
-    ros::Publisher pubLaserCloudCornerLast = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_corner_last", 100);
+    ros::Publisher pubLaserCloudCornerLast = nh.advertise<sensor_msgs::PointCloud2>("laser_cloud_corner_last", 100);
 
-    ros::Publisher pubLaserCloudSurfLast = nh.advertise<sensor_msgs::PointCloud2>("/laser_cloud_surf_last", 100);
+    ros::Publisher pubLaserCloudSurfLast = nh.advertise<sensor_msgs::PointCloud2>("laser_cloud_surf_last", 100);
 
-    ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>("/velodyne_cloud_3", 100);
+    ros::Publisher pubLaserCloudFullRes = nh.advertise<sensor_msgs::PointCloud2>("velodyne_cloud_3", 100);
 
-    ros::Publisher pubLaserOdometry = nh.advertise<nav_msgs::Odometry>("/laser_odom_to_init", 100);
+    ros::Publisher pubLaserOdometry = nh.advertise<nav_msgs::Odometry>("laser_odom_to_init", 100);
 
-    ros::Publisher pubLaserPath = nh.advertise<nav_msgs::Path>("/laser_odom_path", 100);
+    ros::Publisher pubLaserPath = nh.advertise<nav_msgs::Path>("laser_odom_path", 100);
 
     nav_msgs::Path laserPath;
 
@@ -379,10 +411,15 @@ int main(int argc, char **argv)
                                 s = 1.0;
                             ceres::CostFunction *cost_function = LidarEdgeFactor::Create(curr_point, last_point_a, last_point_b, s);
                             problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
+                            cor_corres_csv << corner_correspondence << ",";
                             corner_correspondence++;
+                            // std::pair<std::string, int> cornersToCSV = {"Corner", corner_correspondence};
+                            // writeCSV(cornersToCSV);
                         }
                     }
-
+                    
+                    cor_corres_csv << "\n";
+                    
                     // find correspondence for plane features
                     for (int i = 0; i < surfPointsFlatNum; ++i)
                     {
@@ -477,12 +514,17 @@ int main(int argc, char **argv)
                                     s = 1.0;
                                 ceres::CostFunction *cost_function = LidarPlaneFactor::Create(curr_point, last_point_a, last_point_b, last_point_c, s);
                                 problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
+                                plane_corres_csv << plane_correspondence << ",";
                                 plane_correspondence++;
+                                // std::pair<std::string, int> surfsToCSV = {"Plane", plane_correspondence};
+                                // writeCSV(surfsToCSV);                     
                             }
                         }
                     }
 
-                    //printf("coner_correspondance %d, plane_correspondence %d \n", corner_correspondence, plane_correspondence);
+                    plane_corres_csv << "\n";
+
+                    printf("corner_correspondance %d, plane_correspondence %d \n", corner_correspondence, plane_correspondence);
                     printf("data association time %f ms \n", t_data.toc());
 
                     if ((corner_correspondence + plane_correspondence) < 10)
@@ -500,6 +542,7 @@ int main(int argc, char **argv)
                     printf("solver time %f ms \n", t_solver.toc());
                 }
                 printf("optimization twice time %f \n", t_opt.toc());
+                // printf("surface points num: %d corner points num: %d", surfPointsFlatNum, cornerPointsSharpNum);
 
                 t_w_curr = t_w_curr + q_w_curr * t_last_curr;
                 q_w_curr = q_w_curr * q_last_curr;
@@ -509,8 +552,8 @@ int main(int argc, char **argv)
 
             // publish odometry
             nav_msgs::Odometry laserOdometry;
-            laserOdometry.header.frame_id = "/camera_init";
-            laserOdometry.child_frame_id = "/laser_odom";
+            laserOdometry.header.frame_id = "camera_init";
+            laserOdometry.child_frame_id = "laser_odom";
             laserOdometry.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
             laserOdometry.pose.pose.orientation.x = q_w_curr.x();
             laserOdometry.pose.pose.orientation.y = q_w_curr.y();
@@ -526,7 +569,7 @@ int main(int argc, char **argv)
             laserPose.pose = laserOdometry.pose.pose;
             laserPath.header.stamp = laserOdometry.header.stamp;
             laserPath.poses.push_back(laserPose);
-            laserPath.header.frame_id = "/camera_init";
+            laserPath.header.frame_id = "camera_init";
             pubLaserPath.publish(laserPath);
 
             // transform corner features and plane features to the scan end point
@@ -567,6 +610,11 @@ int main(int argc, char **argv)
             kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
             kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
 
+            // testing writing to CSV
+            // std::ofstream test("/home/ss26/Projects/Active-SLAM/loam_action_space/test.csv");
+            // test << corner_correspondence << "," << plane_correspondence;
+            // test.close();
+
             if (frameCount % skipFrameNum == 0)
             {
                 frameCount = 0;
@@ -574,29 +622,29 @@ int main(int argc, char **argv)
                 sensor_msgs::PointCloud2 laserCloudCornerLast2;
                 pcl::toROSMsg(*laserCloudCornerLast, laserCloudCornerLast2);
                 laserCloudCornerLast2.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
-                laserCloudCornerLast2.header.frame_id = "/camera";
+                laserCloudCornerLast2.header.frame_id = "camera";
                 pubLaserCloudCornerLast.publish(laserCloudCornerLast2);
 
                 sensor_msgs::PointCloud2 laserCloudSurfLast2;
                 pcl::toROSMsg(*laserCloudSurfLast, laserCloudSurfLast2);
                 laserCloudSurfLast2.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
-                laserCloudSurfLast2.header.frame_id = "/camera";
+                laserCloudSurfLast2.header.frame_id = "camera";
                 pubLaserCloudSurfLast.publish(laserCloudSurfLast2);
 
                 sensor_msgs::PointCloud2 laserCloudFullRes3;
                 pcl::toROSMsg(*laserCloudFullRes, laserCloudFullRes3);
                 laserCloudFullRes3.header.stamp = ros::Time().fromSec(timeSurfPointsLessFlat);
-                laserCloudFullRes3.header.frame_id = "/camera";
+                laserCloudFullRes3.header.frame_id = "camera";
                 pubLaserCloudFullRes.publish(laserCloudFullRes3);
             }
             printf("publication time %f ms \n", t_pub.toc());
             printf("whole laserOdometry time %f ms \n \n", t_whole.toc());
-            if(t_whole.toc() > 100)
-                ROS_WARN("odometry process over 100ms");
-
+            if(t_whole.toc() > 100) ROS_WARN("odometry process over 100ms");
             frameCount++;
         }
         rate.sleep();
     }
+    cor_corres_csv.close();
+    plane_corres_csv.close();
     return 0;
 }

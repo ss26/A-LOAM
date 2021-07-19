@@ -84,13 +84,13 @@ int main(int argc, char** argv)
 
     ros::Rate r(10.0 / publish_delay);
     while (std::getline(timestamp_file, line) && ros::ok())
-    {
+    {   
         float timestamp = stof(line);
         std::stringstream left_image_path, right_image_path;
         left_image_path << dataset_folder << "sequences/" + sequence_number + "/image_0/" << std::setfill('0') << std::setw(6) << line_num << ".png";
-        cv::Mat left_image = cv::imread(left_image_path.str(), CV_LOAD_IMAGE_GRAYSCALE);
+        cv::Mat left_image = cv::imread(left_image_path.str(), cv::IMREAD_GRAYSCALE);
         right_image_path << dataset_folder << "sequences/" + sequence_number + "/image_1/" << std::setfill('0') << std::setw(6) << line_num << ".png";
-        cv::Mat right_image = cv::imread(left_image_path.str(), CV_LOAD_IMAGE_GRAYSCALE);
+        cv::Mat right_image = cv::imread(left_image_path.str(), cv::IMREAD_GRAYSCALE);
 
         std::getline(ground_truth_file, line);
         std::stringstream pose_stream(line);
