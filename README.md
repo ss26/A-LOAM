@@ -15,7 +15,7 @@ A-LOAM is an Advanced implementation of LOAM (J. Zhang and S. Singh. LOAM: Lidar
 
 ## 1. Prerequisites
 ### 1.1 **Ubuntu** and **ROS**
-Ubuntu 64-bit 16.04 or 18.04.
+Ubuntu 64-bit 16.04, 18.04 or 20.04. Derivatives of Ubuntu work as well, such as Pop!_OS 20.04. 
 ROS Kinetic or Melodic. [ROS Installation](http://wiki.ros.org/ROS/Installation)
 
 
